@@ -1,0 +1,12 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "天气",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Weather",
+  "start_url": "./",
+  "theme_color": "#ffffff",
+  "lang": "zh"
+}
