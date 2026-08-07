@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天气</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.75);
+            --text-color: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-color: #38bdf8;
+            --font-scale: 1px; /* 字体大小控制基准 */
+        }
+        .light-theme {
+            --bg-color: #f1f5f9;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --text-color: #0f172a;
+            --text-secondary: #64748b;
+            --border-color: rgba(0, 0, 0, 0.1);
+            --accent-color: #0284c7;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            transition: background 0.3s, color 0.3s;
+            font-size: var(--body-font-size, 14px);
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
+        .alert-banner {
+            display: none;
+            background: rgba(244, 63, 94, 0.2);
+            border: 1px solid #f43f5e;
+            color: #f43f5e;
+            padding: 12px 16px;
+            border-radius: 16px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            text-align: center;
+            font-weight: bold;
+            line-height: 1.5;
+            backdrop-filter: blur(10px);
+        }
+        .header-bar {
+            display: flex;
+            gap: 6px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .tool-btn {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 6px;
+            border-radius: 12px;
+            font-size: 11px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            flex: 1;
+            min-width: 50px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .tool-btn:hover {
+            border-color: var(--accent-color);
+        }
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        input, select {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 15px;
+            outline: none;
+            backdrop-filter: blur(10px);
+        }
+        select { flex: 1; display: none; }
+        input { width: 95px; }
+        .search-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0 14px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .custom-dropdown-container {
+            flex: 1;
+            position: relative;
+        }
+        .dropdown-select-trigger {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 15px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dropdown-panel {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 320px;
+            overflow-y: auto;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            z-index: 1000;
+            margin-top: 4px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            padding: 8px;
+        }
+        .dropdown-panel.open {
+            display: block;
+        }
+        .dropdown-search-input {
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 8px;
+            outline: none;
+        }
+        .city-optgroup-header {
+            font-weight: bold;
+            font-size: 13px;
+            color: var(--accent-color);
+            padding: 6px 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.03);
+            margin-top: 4px;
+        }
+        .city-optgroup-header:hover {
+            background: rgba(255,255,255,0.08);
+        }
+        .city-options-list {
+            padding-left: 10px;
+            display: none;
+        }
+        .city-options-list.expanded {
+            display: block;
+        }
+        .city-option-item {
+            padding: 6px 10px;
+            font-size: 13px;
+            cursor: pointer;
+            border-radius: 6px;
+            color: var(--text-color);
+        }
+        .city-option-item:hover {
+            background: var(--accent-color);
+            color: white;
+        }
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            padding: 25px 20px;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+        }
+        h2 { margin: 0 0 5px 0; font-weight: 400; color: var(--text-secondary); font-size: 18px; }
+        .local-time { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+        .temp { font-size: 52px; margin: 5px 0; font-weight: 300; }
+        .condition { font-size: 20px; color: var(--accent-color); margin-bottom: 15px; }
+        .details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+            text-align: left;
+        }
+        .sun-times {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: bold;
+            margin: 20px 0 10px 5px;
+            color: var(--text-color);
+        }
+        .hourly-container {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+        .hourly-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 12px 14px;
+            border-radius: 16px;
+            text-align: center;
+            min-width: 60px;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        .daily-list {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+        }
+        .daily-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .daily-item:last-child { border-bottom: none; }
+        .tips-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px 20px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        .tips-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 15px;
+            color: #f43f5e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 极端天气预警横幅 -->
+        <div id="alertBanner" class="alert-banner"></div>
+
+        <!-- 顶部功能栏 -->
+        <div class="header-bar">
+            <button class="tool-btn" onclick="getLocationWeather()">📍 GPS</button>
+            <button class="tool-btn" onclick="getIPLocationWeather()">🌐 IP</button>
+            <button class="tool-btn" onclick="toggleUnit()" id="unitBtn">℃ / ℉</button>
+            <button class="tool-btn" onclick="toggleHourFormat()" id="hourFormatBtn">24时</button>
+            <button class="tool-btn" onclick="toggleFontSize()" id="fontSizeBtn">🔤 字号</button>
+            <button class="tool-btn" onclick="fetchWeatherData()">🔄 刷新</button>
+            <button class="tool-btn" onclick="toggleTheme()">🌗 主题</button>
+        </div>
+
+        <!-- 城市选择与全球搜索栏 -->
+        <div class="search-box">
+            <div class="custom-dropdown-container">
+                <div class="dropdown-select-trigger" id="dropdownTrigger" onclick="toggleDropdownPanel()">
+                    <span id="selectedCityText">北京</span>
+                    <span>▼</span>
+                </div>
+                <div class="dropdown-panel" id="dropdownPanel">
+                    <input type="text" class="dropdown-search-input" id="dropdownSearchInput" placeholder="🔍 搜索城市（拼音/汉字）..." oninput="filterCityDropdown(this.value)">
+                    <div id="cityGroupsContainer"></div>
+                </div>
+            </div>
+            <select id="citySelect" onchange="changeCity()" style="display:none;">
+                <!-- 华北地区 -->
+                <optgroup label="🇨🇳 国内 - 华北地区">
+                    <option value="39.9042,116.4074,北京">北京</option>
+                    <option value="39.0842,117.2009,天津">天津</option>
+                    <option value="38.0428,114.5149,石家庄">石家庄</option>
+                    <option value="39.6310,118.1802,唐山">唐山</option>
+                    <option value="39.9354,119.6005,秦皇岛">秦皇岛</option>
+                    <option value="36.6124,114.4714,邯郸">邯郸</option>
+                    <option value="37.0707,114.4995,邢台">邢台</option>
+                    <option value="38.8740,115.4646,保定">保定</option>
+                    <option value="40.8175,114.8857,张家口">张家口</option>
+                    <option value="40.9575,117.9539,承德">承德</option>
+                    <option value="38.3104,116.8454,沧州">沧州</option>
+                    <option value="39.5504,116.7026,廊坊">廊坊</option>
+                    <option value="37.7348,115.6695,衡水">衡水</option>
+                    <option value="37.8706,112.5489,太原">太原</option>
+                    <option value="40.1047,113.3001,大同">大同</option>
+                    <option value="37.8570,113.5826,阳泉">阳泉</option>
+                    <option value="36.1857,113.1118,长治">长治</option>
+                    <option value="35.4988,112.8519,晋城">晋城</option>
+                    <option value="39.3340,112.4308,朔州">朔州</option>
+                    <option value="37.4168,112.7540,晋中">晋中</option>
+                    <option value="35.0287,111.0075,运城">运城</option>
+                    <option value="38.4168,112.7222,忻州">忻州</option>
+                    <option value="36.0880,111.5165,临汾">临汾</option>
+                    <option value="37.5188,111.1340,吕梁">吕梁</option>
+                    <option value="40.8422,111.7492,呼和浩特">呼和浩特</option>
+                    <option value="40.6582,109.8404,包头">包头</option>
+                    <option value="39.6739,106.8256,乌海">乌海</option>
+                    <option value="42.2688,118.9324,赤峰">赤峰</option>
+                    <option value="43.6231,122.2863,通辽">通辽</option>
+                    <option value="39.8207,109.9904,鄂尔多斯">鄂尔多斯</option>
+                    <option value="49.2177,119.7617,呼伦贝尔">呼伦贝尔</option>
+                    <option value="40.7583,107.4124,巴彦淖尔">巴彦淖尔</option>
+                    <option value="41.0354,113.1354,乌兰察布">乌兰察布</option>
+                    <option value="46.0747,122.0703,兴安盟">兴安盟</option>
+                    <option value="43.9440,116.0754,锡林郭勒盟">锡林郭勒盟</option>
+                    <option value="38.8388,105.7054,阿拉善盟">阿拉善盟</option>
+                </optgroup>
+
+                <!-- 东北地区 -->
+                <optgroup label="🇨🇳 国内 - 东北地区">
+                    <option value="41.8057,123.4315,沈阳">沈阳</option>
+                    <option value="38.9140,121.6147,大连">大连</option>
+                    <option value="41.1123,122.9904,鞍山">鞍山</option>
+                    <option value="41.8596,123.8930,抚顺">抚顺</option>
+                    <option value="41.3121,123.7663,本溪">本溪</option>
+                    <option value="40.1290,124.3857,丹东">丹东</option>
+                    <option value="41.1190,121.1287,锦州">锦州</option>
+                    <option value="40.6693,122.2353,营口">营口</option>
+                    <option value="42.0227,121.6601,阜新">阜新</option>
+                    <option value="41.2697,123.1815,辽阳">辽阳</option>
+                    <option value="41.1264,122.0694,盘锦">盘锦</option>
+                    <option value="42.2922,123.8447,铁岭">铁岭</option>
+                    <option value="41.5742,120.4571,朝阳">朝阳</option>
+                    <option value="40.7397,120.9575,葫芦岛">葫芦岛</option>
+                    <option value="43.8171,125.3235,长春">长春</option>
+                    <option value="43.8444,126.5492,吉林">吉林</option>
+                    <option value="43.1678,124.3541,四平">四平</option>
+                    <option value="41.7335,125.9554,通化">通化</option>
+                    <option value="41.9467,126.4172,白山">白山</option>
+                    <option value="45.1119,124.8219,松原">松原</option>
+                    <option value="45.6171,122.8427,白城">白城</option>
+                    <option value="42.8987,129.5074,延边">延边</option>
+                    <option value="45.8038,126.5350,哈尔滨">哈尔滨</option>
+                    <option value="47.3421,123.9749,齐齐哈尔">齐齐哈尔</option>
+                    <option value="45.3060,130.9634,鸡西">鸡西</option>
+                    <option value="44.5828,129.6293,牡丹江">牡丹江</option>
+                    <option value="46.8041,130.3666,佳木斯">佳木斯</option>
+                    <option value="46.5910,125.0934,大庆">大庆</option>
+                    <option value="47.7282,128.8914,伊春">伊春</option>
+                    <option value="46.6387,117.2009,黑河">黑河</option>
+                    <option value="46.3822,127.5872,绥化">绥化</option>
+                    <option value="53.4839,121.5333,大兴安岭">大兴安岭</option>
+                    <option value="47.3524,130.2801,鹤岗">鹤岗</option>
+                    <option value="46.6453,131.1630,双鸭山">双鸭山</option>
+                    <option value="45.7700,130.9000,七台河">七台河</option>
+                </optgroup>
+
+                <!-- 华东地区 -->
+                <optgroup label="🇨🇳 国内 - 华东地区">
+                    <option value="31.2304,121.4737,上海">上海</option>
+                    <option value="32.0603,118.7969,南京">南京</option>
+                    <option value="34.2619,117.1853,徐州">徐州</option>
+                    <option value="31.5698,120.3016,无锡">无锡</option>
+                    <option value="31.8112,119.9742,常州">常州</option>
+                    <option value="31.2989,120.5853,苏州">苏州</option>
+                    <option value="32.0145,120.8943,南通">南通</option>
+                    <option value="34.6288,119.2215,连云港">连云港</option>
+                    <option value="33.5975,119.0153,淮安">淮安</option>
+                    <option value="33.3477,120.1585,盐城">盐城</option>
+                    <option value="32.3932,119.4210,扬州">扬州</option>
+                    <option value="32.2037,119.4526,镇江">镇江</option>
+                    <option value="32.4862,119.9152,泰州">泰州</option>
+                    <option value="33.9554,118.2754,宿迁">宿迁</option>
+                    <option value="30.2741,120.1551,杭州">杭州</option>
+                    <option value="29.8683,121.5440,宁波">宁波</option>
+                    <option value="27.9943,120.6994,温州">温州</option>
+                    <option value="30.7533,120.7555,嘉兴">嘉兴</option>
+                    <option value="30.8943,120.0867,湖州">湖州</option>
+                    <option value="30.0031,120.5821,绍兴">绍兴</option>
+                    <option value="29.0791,119.6486,金华">金华</option>
+                    <option value="28.9613,118.8727,衢州">衢州</option>
+                    <option value="29.9855,122.2072,舟山">舟山</option>
+                    <option value="28.6565,121.4208,台州">台州</option>
+                    <option value="28.4604,119.9295,丽水">丽水</option>
+                    <option value="31.8206,117.2272,合肥">合肥</option>
+                    <option value="31.3590,118.4356,芜湖">芜湖</option>
+                    <option value="32.9343,117.3913,蚌埠">蚌埠</option>
+                    <option value="32.6289,117.0009,淮南">淮南</option>
+                    <option value="31.6708,118.5133,马鞍山">马鞍山</option>
+                    <option value="33.9507,116.8166,淮北">淮北</option>
+                    <option value="30.9535,117.8105,铜陵">铜陵</option>
+                    <option value="30.5188,117.0428,安庆">安庆</option>
+                    <option value="29.7147,118.3375,黄山">黄山</option>
+                    <option value="32.3025,118.3039,滁州">滁州</option>
+                    <option value="32.8973,115.8105,阜阳">阜阳</option>
+                    <option value="33.6300,117.3197,宿州">宿州</option>
+                    <option value="31.7513,116.3054,六安">六安</option>
+                    <option value="33.8644,115.7782,亳州">亳州</option>
+                    <option value="30.6588,117.5133,池州">池州</option>
+                    <option value="30.9572,118.7617,宣城">宣城</option>
+                    <option value="26.0745,119.2965,福州">福州</option>
+                    <option value="24.4798,118.0894,厦门">厦门</option>
+                    <option value="25.4353,119.0076,莆田">莆田</option>
+                    <option value="26.2628,117.6254,三明">三明</option>
+                    <option value="24.9079,118.5858,泉州">泉州</option>
+                    <option value="24.5126,117.6474,漳州">漳州</option>
+                    <option value="26.6517,118.1795,南平">南平</option>
+                    <option value="25.0805,117.0279,龙岩">龙岩</option>
+                    <option value="26.6559,119.5478,宁德">宁德</option>
+                    <option value="28.6820,115.8579,南昌">南昌</option>
+                    <option value="29.2902,117.1785,景德镇">景德镇</option>
+                    <option value="27.6234,113.8540,萍乡">萍乡</option>
+                    <option value="29.7051,115.9928,九江">九江</option>
+                    <option value="27.8206,114.9204,新余">新余</option>
+                    <option value="28.2612,117.0326,鹰潭">鹰潭</option>
+                    <option value="25.8315,114.9354,赣州">赣州</option>
+                    <option value="27.1134,114.9854,吉安">吉安</option>
+                    <option value="28.3421,114.4087,宜春">宜春</option>
+                    <option value="27.9472,116.3575,抚州">抚州</option>
+                    <option value="28.4559,117.9714,上饶">上饶</option>
+                    <option value="36.6512,117.1201,济南">济南</option>
+                    <option value="36.0671,120.3826,青岛">青岛</option>
+                    <option value="36.8131,118.0558,淄博">淄博</option>
+                    <option value="34.8115,117.5584,枣庄">枣庄</option>
+                    <option value="37.4346,118.6749,东营">东营</option>
+                    <option value="37.4638,121.4479,烟台">烟台</option>
+                    <option value="36.7066,119.1595,潍坊">潍坊</option>
+                    <option value="35.4154,116.5872,济宁">济宁</option>
+                    <option value="36.1954,117.1282,泰安">泰安</option>
+                    <option value="37.5131,122.1207,威海">威海</option>
+                    <option value="35.4168,119.5210,日照">日照</option>
+                    <option value="35.1044,118.3564,临沂">临沂</option>
+                    <option value="37.4449,116.3654,德州">德州</option>
+                    <option value="36.4515,115.9839,聊城">聊城</option>
+                    <option value="37.3787,117.9943,滨州">滨州</option>
+                    <option value="35.2345,115.4804,菏泽">菏泽</option>
+                </optgroup>
+
+                <!-- 华中地区 -->
+                <optgroup label="🇨🇳 国内 - 华中地区">
+                    <option value="34.7466,113.6254,郑州">郑州</option>
+                    <option value="34.7975,114.3093,开封">开封</option>
+                    <option value="34.6181,112.4540,洛阳">洛阳</option>
+                    <option value="33.7443,113.1897,平顶山">平顶山</option>
+                    <option value="36.0975,114.3913,安阳">安阳</option>
+                    <option value="35.7533,114.3016,鹤壁">鹤壁</option>
+                    <option value="35.3023,113.9298,新乡">新乡</option>
+                    <option value="35.2215,113.2418,焦作">焦作</option>
+                    <option value="35.7656,115.0298,濮阳">濮阳</option>
+                    <option value="34.0169,113.8404,许昌">许昌</option>
+                    <option value="33.5714,114.0275,漯河">漯河</option>
+                    <option value="34.7766,111.2010,三门峡">三门峡</option>
+                    <option value="32.9904,112.5328,南阳">南阳</option>
+                    <option value="34.4459,115.6555,商丘">商丘</option>
+                    <option value="32.1274,114.0754,信阳">信阳</option>
+                    <option value="33.6294,114.7009,周口">周口</option>
+                    <option value="32.9814,114.0169,驻马店">驻马店</option>
+                    <option value="30.5928,114.3055,武汉">武汉</option>
+                    <option value="30.2074,115.0384,黄石">黄石</option>
+                    <option value="32.7485,110.7954,十堰">十堰</option>
+                    <option value="30.6919,111.2865,宜昌">宜昌</option>
+                    <option value="32.0423,112.1293,襄阳">襄阳</option>
+                    <option value="30.3838,114.8914,鄂州">鄂州</option>
+                    <option value="31.0304,112.2039,荆门">荆门</option>
+                    <option value="30.9254,113.9210,孝感">孝感</option>
+                    <option value="30.3349,112.2384,荆州">荆州</option>
+                    <option value="30.4539,115.0326,黄冈">黄冈</option>
+                    <option value="29.8404,114.4265,咸宁">咸宁</option>
+                    <option value="31.7026,113.3826,随州">随州</option>
+                    <option value="30.2789,109.4863,恩施">恩施</option>
+                    <option value="30.3604,113.4539,仙桃">仙桃</option>
+                    <option value="30.2917,112.8937,潜江">潜江</option>
+                    <option value="30.6558,113.1673,天门">天门</option>
+                    <option value="31.7455,110.6723,神农架">神农架</option>
+                    <option value="28.2282,112.9388,长沙">长沙</option>
+                    <option value="27.8304,113.1534,株洲">株洲</option>
+                    <option value="27.8549,112.9298,湘潭">湘潭</option>
+                    <option value="26.8924,112.6104,衡阳">衡阳</option>
+                    <option value="27.2418,111.4694,邵阳">邵阳</option>
+                    <option value="29.3798,113.1293,岳阳">岳阳</option>
+                    <option value="29.0315,111.6988,常德">常德</option>
+                    <option value="29.1174,110.4792,张家界">张家界</option>
+                    <option value="28.5834,112.3541,益阳">益阳</option>
+                    <option value="25.7997,113.0134,郴州">郴州</option>
+                    <option value="26.2202,111.6039,永州">永州</option>
+                    <option value="27.5584,109.9984,怀化">怀化</option>
+                    <option value="27.3826,111.9795,娄底">娄底</option>
+                    <option value="28.3128,109.7397,湘西">湘西</option>
+                </optgroup>
+
+                <!-- 华南地区 -->
+                <optgroup label="🇨🇳 国内 - 华南地区">
+                    <option value="23.1291,113.2644,广州">广州</option>
+                    <option value="24.8115,113.5975,韶关">韶关</option>
+                    <option value="22.5431,114.0579,深圳">深圳</option>
+                    <option value="22.2707,113.5767,珠海">珠海</option>
+                    <option value="23.3540,116.6819,汕头">汕头</option>
+                    <option value="23.0215,113.1214,佛山">佛山</option>
+                    <option value="22.5786,113.0825,江门">江门</option>
+                    <option value="21.2725,110.3649,湛江">湛江</option>
+                    <option value="21.6604,110.9192,茂名">茂名</option>
+                    <option value="23.0515,112.4674,肇庆">肇庆</option>
+                    <option value="23.1116,114.4165,惠州">惠州</option>
+                    <option value="24.3054,116.1224,梅州">梅州</option>
+                    <option value="22.7844,115.3649,汕尾">汕尾</option>
+                    <option value="23.7434,114.6943,河源">河源</option>
+                    <option value="21.8596,111.9825,阳江">阳江</option>
+                    <option value="23.7604,113.0575,清远">清远</option>
+                    <option value="23.0205,113.7518,东莞">东莞</option>
+                    <option value="22.5159,113.3925,中山">中山</option>
+                    <option value="23.6554,116.6204,潮州">潮州</option>
+                    <option value="22.5489,116.3654,揭阳">揭阳</option>
+                    <option value="22.5838,112.0465,云浮">云浮</option>
+                    <option value="22.8170,108.3665,南宁">南宁</option>
+                    <option value="24.3254,109.4124,柳州">柳州</option>
+                    <option value="25.2736,110.2900,桂林">桂林</option>
+                    <option value="23.4792,111.2943,梧州">梧州</option>
+                    <option value="21.4819,109.1234,北海">北海</option>
+                    <option value="21.6914,108.3515,防城港">防城港</option>
+                    <option value="21.9634,108.6541,钦州">钦州</option>
+                    <option value="23.1012,109.6015,贵港">贵港</option>
+                    <option value="22.6325,110.1515,玉林">玉林</option>
+                    <option value="23.8987,106.6115,百色">百色</option>
+                    <option value="24.9126,111.5584,贺州">贺州</option>
+                    <option value="24.7015,108.0326,河池">河池</option>
+                    <option value="23.5131,109.4124,来宾">来宾</option>
+                    <option value="22.4044,106.7515,崇左">崇左</option>
+                    <option value="20.0440,110.3492,海口">海口</option>
+                    <option value="18.2528,109.5119,三亚">三亚</option>
+                    <option value="16.8315,112.3353,三沙">三沙</option>
+                    <option value="19.5143,109.5783,儋州">儋州</option>
+                </optgroup>
+
+                <!-- 西南地区 -->
+                <optgroup label="🇨🇳 国内 - 西南地区">
+                    <option value="29.5658,106.5512,重庆">重庆</option>
+                    <option value="30.5728,104.0668,成都">成都</option>
+                    <option value="29.3404,104.7784,自贡">自贡</option>
+                    <option value="26.5815,101.7182,攀枝花">攀枝花</option>
+                    <option value="28.8782,105.4424,泸州">泸州</option>
+                    <option value="31.3004,104.4326,德阳">德阳</option>
+                    <option value="31.4674,104.7424,绵阳">绵阳</option>
+                    <option value="32.4334,105.8424,广元">广元</option>
+                    <option value="30.5188,105.5754,遂宁">遂宁</option>
+                    <option value="29.5934,105.0575,内江">内江</option>
+                    <option value="29.5815,103.7575,乐山">乐山</option>
+                    <option value="30.8015,106.0754,南充">南充</option>
+                    <option value="30.0715,103.8424,眉山">眉山</option>
+                    <option value="28.7615,104.6298,宜宾">宜宾</option>
+                    <option value="30.4572,106.6115,广安">广安</option>
+                    <option value="31.2115,107.5015,达州">达州</option>
+                    <option value="31.8596,106.7515,巴中">巴中</option>
+                    <option value="30.0031,103.0115,雅安">雅安</option>
+                    <option value="30.1292,104.6288,资阳">资阳</option>
+                    <option value="31.9034,102.2223,阿坝藏族羌族自治州">阿坝藏族羌族自治州</option>
+                    <option value="30.0518,101.9631,甘孜藏族自治州">甘孜藏族自治州</option>
+                    <option value="27.8822,102.2604,凉山彝族自治州">凉山彝族自治州</option>
+                    <option value="26.6470,106.6302,贵阳">贵阳</option>
+                    <option value="26.5982,104.8315,六盘水">六盘水</option>
+                    <option value="27.7282,106.9298,遵义">遵义</option>
+                    <option value="26.2515,105.9326,安顺">安顺</option>
+                    <option value="27.3015,105.2825,毕节">毕节</option>
+                    <option value="27.3015,109.2825,铜仁">铜仁</option>
+                    <option value="25.0944,104.9015,黔西南布依族苗族自治州">黔西南布依族苗族自治州</option>
+                    <option value="26.5834,107.9784,黔东南苗族侗族自治州">黔东南苗族侗族自治州</option>
+                    <option value="26.2554,107.5194,黔南布依族苗族自治州">黔南布依族苗族自治州</option>
+                    <option value="25.0458,102.7103,昆明">昆明</option>
+                    <option value="25.2892,103.7915,曲靖">曲靖</option>
+                    <option value="24.3544,102.5440,玉溪">玉溪</option>
+                    <option value="25.1115,99.1674,保山">保山</option>
+                    <option value="27.3325,103.7124,昭通">昭通</option>
+                    <option value="26.8724,100.2298,丽江">丽江</option>
+                    <option value="22.7844,100.9749,普洱">普洱</option>
+                    <option value="23.8887,99.8825,临沧">临沧</option>
+                    <option value="25.0393,101.5460,楚雄彝族自治州">楚雄彝族自治州</option>
+                    <option value="23.3670,103.3836,红河哈尼族彝族自治州">红河哈尼族彝族自治州</option>
+                    <option value="23.3678,104.2449,文山壮族苗族自治州">文山壮族苗族自治州</option>
+                    <option value="22.0088,100.7977,西双版纳傣族自治州">西双版纳傣族自治州</option>
+                    <option value="25.6065,100.2676,大理白族自治州">大理白族自治州</option>
+                    <option value="24.4367,98.5786,德宏傣族景颇族自治州">德宏傣族景颇族自治州</option>
+                    <option value="25.8509,98.8542,怒江傈僳族自治州">怒江傈僳族自治州</option>
+                    <option value="27.8188,99.7046,迪庆藏族自治州">迪庆藏族自治州</option>
+                    <option value="29.6525,91.1721,拉萨">拉萨</option>
+                    <option value="29.2688,88.8825,日喀则">日喀则</option>
+                    <option value="31.1396,97.1785,昌都">昌都市</option>
+                    <option value="29.3115,94.3626,林芝">林芝</option>
+                    <option value="29.2393,91.7699,山南">山南市</option>
+                    <option value="31.4760,92.0592,那曲">那曲市</option>
+                    <option value="32.5029,80.1047,阿里">阿里地区</option>
+                </optgroup>
+
+                <!-- 西北地区 -->
+                <optgroup label="🇨🇳 国内 - 西北地区">
+                    <option value="34.3416,108.9398,西安">西安</option>
+                    <option value="34.9044,109.0153,铜川">铜川</option>
+                    <option value="34.3644,107.1354,宝鸡">宝鸡</option>
+                    <option value="34.3316,108.7093,咸阳">咸阳</option>
+                    <option value="34.4988,109.5075,渭南">渭南</option>
+                    <option value="36.5915,109.4894,延安">延安</option>
+                    <option value="33.0674,107.0298,汉中">汉中</option>
+                    <option value="38.2815,109.7397,榆林">榆林</option>
+                    <option value="32.6715,107.0298,安康">安康</option>
+                    <option value="33.8744,109.9424,商洛">商洛</option>
+                    <option value="36.0611,103.8343,兰州">兰州</option>
+                    <option value="39.7715,98.4975,嘉峪关">嘉峪关</option>
+                    <option value="38.5131,102.1854,金昌">金昌</option>
+                    <option value="36.5515,104.1415,白银">白银</option>
+                    <option value="34.5815,105.7326,天水">天水</option>
+                    <option value="37.9282,102.6424,武威">武威</option>
+                    <option value="38.9325,100.4575,张掖市">张掖市</option>
+                    <option value="35.5424,106.6715,平凉">平凉</option>
+                    <option value="39.7397,94.6715,酒泉">酒泉</option>
+                    <option value="35.7397,107.6326,庆阳">庆阳</option>
+                    <option value="35.5815,104.6298,定西">定西</option>
+                    <option value="33.3934,104.9224,陇南">陇南</option>
+                    <option value="35.6033,103.2128,临夏回族自治州">临夏回族自治州</option>
+                    <option value="34.9829,102.9103,甘南藏族自治州">甘南藏族自治州</option>
+                    <option value="36.6171,101.7782,西宁">西宁</option>
+                    <option value="36.5131,101.7515,海东">海东</option>
+                    <option value="36.9631,100.8953,海北藏族自治州">海北藏族自治州</option>
+                    <option value="35.5186,102.0163,黄南藏族自治州">黄南藏族自治州</option>
+                    <option value="36.2828,100.6186,海南藏族自治州">海南藏族自治州</option>
+                    <option value="34.4746,100.2443,果洛藏族自治州">果洛藏族自治州</option>
+                    <option value="33.0039,97.0092,玉树藏族自治州">玉树藏族自治州</option>
+                    <option value="37.3719,97.3694,海西蒙古族藏族自治州">海西蒙古族藏族自治州</option>
+                    <option value="38.4872,106.2309,银川">银川</option>
+                    <option value="39.0115,106.3798,石嘴山">石嘴山</option>
+                    <option value="37.9892,106.1825,吴忠">吴忠</option>
+                    <option value="36.0015,106.2825,固原">固原</option>
+                    <option value="37.5097,105.5315,中卫">中卫</option>
+                    <option value="43.8256,87.6168,乌鲁木齐">乌鲁木齐</option>
+                    <option value="44.5944,84.8687,克拉玛依">克拉玛依</option>
+                    <option value="42.9424,89.1825,吐鲁番">吐鲁番</option>
+                    <option value="42.8392,93.4515,哈密">哈密</option>
+                    <option value="44.0175,87.3146,昌吉回族自治州">昌吉回族自治州</option>
+                    <option value="44.9009,82.0716,博尔塔拉蒙古自治州">博尔塔拉蒙古自治州</option>
+                    <option value="41.1374,87.1515,巴音郭楞蒙古自治州">巴音郭楞蒙古自治州</option>
+                    <option value="41.1688,80.2674,阿克苏地区">阿克苏地区</option>
+                    <option value="39.7155,70.7828,克孜勒苏柯尔克孜自治州">克孜勒苏柯尔克孜自治州</option>
+                    <option value="39.4674,75.9892,喀什地区">喀什地区</option>
+                    <option value="37.1143,79.9239,和田地区">和田地区</option>
+                    <option value="43.9215,81.3197,伊犁哈萨克自治州">伊犁哈萨克自治州</option>
+                    <option value="46.7463,82.9886,塔城地区">塔城地区</option>
+                    <option value="47.8465,88.1396,阿勒泰地区">阿勒泰地区</option>
+                </optgroup>
+
+                <!-- 港澳台地区 -->
+                <optgroup label="🇨🇳 国内 - 港澳台地区">
+                    <option value="22.3193,114.1694,香港">香港</option>
+                    <option value="22.1987,113.5439,澳门">澳门</option>
+                    <option value="25.0330,121.5654,台北">台北</option>
+                    <option value="22.6273,120.3014,高雄">高雄</option>
+                    <option value="24.1477,120.6736,台中">台中</option>
+                    <option value="22.9997,120.2270,台南">台南</option>
+                    <option value="24.8138,120.9675,新竹">新竹</option>
+                    <option value="24.9936,121.3010,桃园">桃园</option>
+                    <option value="25.1321,121.7397,基隆">基隆</option>
+                </optgroup>
+
+                <!-- 国际 - 亚洲地区 -->
+                <optgroup label="🌏 国际 - 亚洲地区">
+                    <option value="35.6762,139.6503,🇯🇵 东京">🇯🇵 东京</option>
+                    <option value="34.6937,135.5022,🇯🇵 大阪">🇯🇵 大阪</option>
+                    <option value="35.0116,135.7681,🇯🇵 京都">🇯🇵 京都</option>
+                    <option value="34.6901,135.1955,🇯🇵 神户">🇯🇵 神户</option>
+                    <option value="35.1815,136.9066,🇯🇵 名古屋">🇯🇵 名古屋</option>
+                    <option value="33.5904,130.4017,🇯🇵 福冈">🇯🇵 福冈</option>
+                    <option value="43.0642,141.3469,🇯🇵 札幌">🇯🇵 札幌</option>
+                    <option value="37.5665,126.9780,🇰🇷 首尔">🇰🇷 首尔</option>
+                    <option value="35.1796,129.0756,🇰🇷 釜山">🇰🇷 釜山</option>
+                    <option value="37.4563,126.7052,🇰🇷 仁川">🇰🇷 仁川</option>
+                    <option value="35.8714,128.6014,🇰🇷 大邱">🇰🇷 大邱</option>
+                    <option value="1.3521,103.8198,🇸🇬 新加坡">🇸🇬 新加坡</option>
+                    <option value="13.7563,100.5018,🇹🇭 曼谷">🇹🇭 曼谷</option>
+                    <option value="18.7883,98.9853,🇹🇭 清迈">🇹🇭 清迈</option>
+                    <option value="7.8804,98.3923,🇹🇭 普吉">🇹🇭 普吉</option>
+                    <option value="21.0285,105.8542,🇻🇳 河内">🇻🇳 河内</option>
+                    <option value="10.8231,106.6297,🇻🇳 胡志明市">🇻🇳 胡志明市</option>
+                    <option value="14.5995,120.9842,🇵🇭 马尼拉">🇵🇭 马尼拉</option>
+                    <option value="3.1390,101.6869,🇲🇾 吉隆坡">🇲🇾 吉隆坡</option>
+                    <option value="-6.2088,106.8456,🇮🇩 雅加达">🇮🇩 雅加达</option>
+                    <option value="-8.4095,115.1889,🇮🇩 巴厘岛">🇮🇩 巴厘岛</option>
+                    <option value="28.6139,77.2090,🇮🇳 新德里">🇮🇳 新德里</option>
+                    <option value="19.0760,72.8777,🇮🇳 孟买">🇮🇳 孟买</option>
+                    <option value="22.5726,88.3639,🇮🇳 加尔各答">🇮🇳 加尔各答</option>
+                    <option value="12.9716,77.5946,🇮🇳 班加罗尔">🇮🇳 班加罗尔</option>
+                    <option value="33.6844,73.0479,🇵🇰 伊斯兰堡">🇵🇰 伊斯兰堡</option>
+                    <option value="25.2048,55.2708,🇦🇪 迪拜">🇦🇪 迪拜</option>
+                    <option value="24.4539,54.3773,🇦🇪 阿布扎比">🇦🇪 阿布扎比</option>
+                    <option value="24.7136,46.6753,🇸🇦 利雅得">🇸🇦 利雅得</option>
+                    <option value="35.6892,51.3890,🇮🇷 德黑兰">🇮🇷 德黑兰</option>
+                    <option value="32.0853,34.7818,🇮🇱 特拉维夫">🇮🇱 特拉维夫</option>
+                    <option value="41.0082,28.9784,🇹🇷 伊斯坦布尔">🇹🇷 伊斯坦布尔</option>
+                    <option value="39.9334,32.8597,🇹🇷 安卡拉">🇹🇷 安卡拉</option>
+                    <option value="25.2854,51.5310,🇶🇦 多哈">🇶🇦 多哈</option>
+                    <option value="51.1694,71.4491,🇰🇿 阿斯塔纳">🇰🇿 阿斯塔纳</option>
+                </optgroup>
+
+                <!-- 国际 - 欧洲地区 -->
+                <optgroup label="🌍 国际 - 欧洲地区">
+                    <option value="51.5074,-0.1278,🇬🇧 伦敦">🇬🇧 伦敦</option>
+                    <option value="53.4808,-2.2426,🇬🇧 曼彻斯特">🇬🇧 曼彻斯特</option>
+                    <option value="55.9533,-3.1883,🇬🇧 爱丁堡">🇬🇧 爱丁堡</option>
+                    <option value="48.8566,2.3522,🇫🇷 巴黎">🇫🇷 巴黎</option>
+                    <option value="43.2965,5.3698,🇫🇷 马赛">🇫🇷 马赛</option>
+                    <option value="45.7640,4.8357,🇫🇷 里昂">🇫🇷 里昂</option>
+                    <option value="52.5200,13.4050,🇩🇪 柏林">🇩🇪 柏林</option>
+                    <option value="48.1351,11.5820,🇩🇪 慕尼黑">🇩🇪 慕尼黑</option>
+                    <option value="50.1109,8.6821,🇩🇪 法兰克福">🇩🇪 法兰克福</option>
+                    <option value="53.5511,9.9937,🇩🇪 汉堡">🇩🇪 汉堡</option>
+                    <option value="41.9028,12.4964,🇮🇹 罗马">🇮🇹 罗马</option>
+                    <option value="45.4642,9.1900,🇮🇹 米兰">🇮🇹 米兰</option>
+                    <option value="45.4408,12.3155,🇮🇹 威尼斯">🇮🇹 威尼斯</option>
+                    <option value="40.4168,-3.7038,🇪🇸 马德里">🇪🇸 马德里</option>
+                    <option value="41.3851,2.1734,🇪🇸 巴塞罗那">🇪🇸 巴塞罗那</option>
+                    <option value="52.3676,4.9041,🇳🇱 阿姆斯特丹">🇳🇱 阿姆斯特丹</option>
+                    <option value="47.3769,8.5417,🇨🇭 苏黎世">🇨🇭 苏黎世</option>
+                    <option value="46.2044,6.1432,🇨🇭 日内瓦">🇨🇭 日内瓦</option>
+                    <option value="50.8503,4.3517,🇧🇪 布鲁塞尔">🇧🇪 布鲁塞尔</option>
+                    <option value="48.2082,16.3738,🇦🇹 维也纳">🇦🇹 维也纳</option>
+                    <option value="38.7223,-9.1393,🇵🇹 里斯本">🇵🇹 里斯本</option>
+                    <option value="37.9838,23.7275,🇬🇷 雅典">🇬🇷 雅典</option>
+                    <option value="53.3498,-6.2603,🇮🇪 都柏林">🇮🇪 都柏林</option>
+                    <option value="52.2297,21.0122,🇵🇱 华沙">🇵🇱 华沙</option>
+                    <option value="50.0755,14.4378,🇨🇿 布拉格">🇨🇿 布拉格</option>
+                    <option value="47.4979,19.0402,🇭🇺 布达佩斯">🇭🇺 布达佩斯</option>
+                    <option value="45.8150,15.9819,🇭🇷 萨格勒布">🇭🇷 萨格勒布</option>
+                    <option value="44.4268,26.1025,🇷🇴 布加勒斯特">🇷🇴 布加勒斯特</option>
+                    <option value="59.3293,18.0686,🇸🇪 斯德哥尔摩">🇸🇪 斯德哥尔摩</option>
+                    <option value="59.9139,10.7522,🇳🇴 奥斯陆">🇳🇴 奥斯陆</option>
+                    <option value="55.6761,12.5683,🇩🇰 哥本哈根">🇩🇰 哥本哈根</option>
+                    <option value="56.1629,10.2039,🇩🇰 奥胡斯">🇩🇰 奥胡斯</option>
+                    <option value="60.1699,24.9384,🇫🇮 赫尔辛基">🇫🇮 赫尔辛基</option>
+                    <option value="64.1466,-21.9426,🇮🇸 雷克雅未克">🇮🇸 雷克雅未克</option>
+                    <option value="55.7558,37.6173,🇷🇺 莫斯科">🇷🇺 莫斯科</option>
+                    <option value="59.9343,30.3351,🇷🇺 圣彼得堡">🇷🇺 圣彼得堡</option>
+                </optgroup>
+
+                <!-- 国际 - 北美洲地区 -->
+                <optgroup label="🌎 国际 - 北美洲地区">
+                    <option value="40.7128,-74.0060,🇺🇸 纽约">🇺🇸 纽约</option>
+                    <option value="34.0522,-118.2437,🇺🇸 洛杉矶">🇺🇸 洛杉矶</option>
+                    <option value="41.8781,-87.6298,🇺🇸 芝加哥">🇺🇸 芝加哥</option>
+                    <option value="29.7604,-95.3698,🇺🇸 休斯敦">🇺🇸 休斯敦</option>
+                    <option value="32.7767,-96.7970,🇺🇸 达拉斯">🇺🇸 达拉斯</option>
+                    <option value="33.7490,-84.3880,🇺🇸 亚特兰大">🇺🇸 亚特兰大</option>
+                    <option value="33.4484,-112.0740,🇺🇸 凤凰城">🇺🇸 凤凰城</option>
+                    <option value="32.7157,-117.1611,🇺🇸 圣迭戈">🇺🇸 圣迭戈</option>
+                    <option value="30.2672,-97.7431,🇺🇸 奥斯汀">🇺🇸 奥斯汀</option>
+                    <option value="37.7749,-122.4194,🇺🇸 旧金山">🇺🇸 旧金山</option>
+                    <option value="47.6062,-122.3321,🇺🇸 西雅图">🇺🇸 西雅图</option>
+                    <option value="39.7392,-104.9903,🇺🇸 丹佛">🇺🇸 丹佛</option>
+                    <option value="42.3601,-71.0589,🇺🇸 波士顿">🇺🇸 波士顿</option>
+                    <option value="25.7617,-80.1918,🇺🇸 迈阿密">🇺🇸 迈阿密</option>
+                    <option value="38.9072,-77.0369,🇺🇸 华盛顿">🇺🇸 华盛顿</option>
+                    <option value="36.1699,-115.1398,🇺🇸 拉斯维加斯">🇺🇸 拉斯维加斯</option>
+                    <option value="43.6532,-79.3832,🇨🇦 多伦多">🇨🇦 多伦多</option>
+                    <option value="45.4215,-75.6972,🇨🇦 渥太华">🇨🇦 渥太华</option>
+                    <option value="49.2827,-123.1207,🇨🇦 温哥华">🇨🇦 温哥华</option>
+                    <option value="45.5017,-73.5673,🇨🇦 蒙特利尔">🇨🇦 蒙特利尔</option>
+                    <option value="46.8139,-71.2080,🇨🇦 魁北克市">🇨🇦 魁北克市</option>
+                    <option value="51.0447,-114.0719,🇨🇦 卡尔加里">🇨🇦 卡尔加里</option>
+                    <option value="19.4326,-99.1332,🇲🇽 墨西哥城">🇲🇽 墨西哥城</option>
+                    <option value="20.6597,-103.3496,🇲🇽 瓜达拉哈拉">🇲🇽 瓜达拉哈拉</option>
+                </optgroup>
+
+                <!-- 国际 - 南美洲地区 -->
+                <optgroup label="🌎 国际 - 南美洲地区">
+                    <option value="-23.5505,-46.6333,🇧🇷 圣保罗">🇧🇷 圣保罗</option>
+                    <option value="-22.9068,-43.1729,🇧🇷 里约热内卢">🇧🇷 里约热内卢</option>
+                    <option value="-15.7975,-47.8919,🇧🇷 巴西利亚">🇧🇷 巴西利亚</option>
+                    <option value="-34.6037,-58.3816,🇦🇷 布宜诺斯艾利斯">🇦🇷 布宜诺斯艾利斯</option>
+                    <option value="-31.4201,-64.1888,🇦🇷 科尔多瓦">🇦🇷 科尔多瓦</option>
+                    <option value="-32.8895,-68.8458,🇦🇷 门多萨">🇦🇷 门多萨</option>
+                    <option value="-33.4489,-70.6693,🇨🇱 圣地亚哥">🇨🇱 圣地亚哥</option>
+                    <option value="4.7110,-74.0721,🇨🇴 波哥大">🇨🇴 波哥大</option>
+                    <option value="-12.0464,-77.0428,🇵🇪 利马">🇵🇪 利马</option>
+                    <option value="-34.9011,-56.1645,🇺🇾 蒙得维的亚">🇺🇾 蒙得维的亚</option>
+                </optgroup>
+
+                <!-- 国际 - 大洋洲地区 -->
+                <optgroup label="🌍 国际 - 大洋洲地区">
+                    <option value="-33.8688,151.2093,🇦🇺 悉尼">🇦🇺 悉尼</option>
+                    <option value="-37.8136,144.9631,🇦🇺 墨尔本">🇦🇺 墨尔本</option>
+                    <option value="-27.4698,153.0251,🇦🇺 布里斯班">🇦🇺 布里斯班</option>
+                    <option value="-35.2809,149.1300,🇦🇺 堪培拉">🇦🇺 堪培拉</option>
+                    <option value="-31.9505,115.8605,🇦🇺 珀斯">🇦🇺 珀斯</option>
+                    <option value="-34.9285,138.6007,🇦🇺 阿德莱德">🇦🇺 阿德莱德</option>
+                    <option value="-36.8485,174.7633,🇳🇿 奥克兰">🇳🇿 奥克兰</option>
+                    <option value="-41.2866,174.7756,🇳🇿 惠灵顿">🇳🇿 惠灵顿</option>
+                </optgroup>
+
+                <!-- 国际 - 非洲地区 -->
+                <optgroup label="🌍 国际 - 非洲地区">
+                    <option value="30.0444,31.2357,🇪🇬 开罗">🇪🇬 开罗</option>
+                    <option value="31.2001,29.9187,🇪🇬 亚历山大">🇪🇬 亚历山大</option>
+                    <option value="-33.9249,18.4241,🇿🇦 开普敦">🇿🇦 开普敦</option>
+                    <option value="-26.2041,28.0473,🇿🇦 约翰内斯堡">🇿🇦 约翰内斯堡</option>
+                    <option value="-29.8587,31.0218,🇿🇦 德班">🇿🇦 德班</option>
+                    <option value="6.5244,3.3792,🇳🇬 拉各斯">🇳🇬 拉各斯</option>
+                    <option value="9.0579,7.4951,🇳🇬 阿布贾">🇳🇬 阿布贾</option>
+                    <option value="-1.2921,36.8219,🇰🇪 内罗毕">🇰🇪 内罗毕</option>
+                    <option value="33.5731,-7.5898,🇲🇦 卡萨布兰卡">🇲🇦 卡萨布兰卡</option>
+                    <option value="36.8065,10.1815,🇹🇳 突尼斯">🇹🇳 突尼斯</option>
+                    <option value="9.0320,38.7469,🇪🇹 亚的斯亚贝巴">🇪🇹 亚的斯亚贝巴</option>
+                </optgroup>
+            </select>
+            <input type="text" id="customCityInput" placeholder="搜索城市">
+            <button class="search-btn" onclick="searchCustomCity()">搜索</button>
+        </div>
+
+        <!-- 天气主面板 -->
+        <div class="card">
+            <h2 id="cityName">北京</h2>
+            <div class="local-time" id="localTime">当地时间: --</div>
+            <div class="temp" id="temp">--°C</div>
+            <div class="condition" id="condition">加载中...</div>
+            <div class="details">
+                <div>体感温度: <span id="apparentTemp">--°C</span></div>
+                <div>空气湿度: <span id="humidity">--%</span></div>
+                <div>风向风速: <span id="windSpeed">--</span></div>
+                <div>大气气压: <span id="pressure">-- hPa</span></div>
+                <div>阵风风速: <span id="windGusts">-- km/h</span></div>
+                <div>紫外线等级: <span id="uvIndex">--</span></div>
+                <div>降水概率: <span id="precipitationProb">--%</span></div>
+                <div>预计雨量: <span id="precipitationAmount">-- mm</span></div>
+                <div>能见度: <span id="visibility">-- km</span></div>
+                <div>积雪深度: <span id="snowDepth">-- cm</span></div>
+            </div>
+            <div class="sun-times">
+                <span>🌅 日出: <span id="sunriseTime">--:--</span></span>
+                <span>🌇 日落: <span id="sunsetTime">--:--</span></span>
+            </div>
+        </div>
+
+        <!-- 空气质量与污染指数面板 -->
+        <div class="card">
+            <h3 style="margin: 0 0 10px 0; font-size: 15px; color: var(--text-color);">🍃 空气质量与污染健康指数</h3>
+            <div class="details" style="border-top: none; padding-top: 0; margin-top: 0;">
+                <div>欧标 AQI: <span id="europeanAqi">--</span></div>
+                <div>国标 AQI (估算): <span id="nationalAqi">--</span></div>
+                <div>PM2.5: <span id="pm25">--</span> µg/m³</div>
+                <div>PM10: <span id="pm10">--</span> µg/m³</div>
+                <div>二氧化氮 (NO2): <span id="no2">--</span> µg/m³</div>
+                <div>臭氧 (O3): <span id="ozone">--</span> µg/m³</div>
+                <div style="grid-column: span 2;">空气质量状态: <span id="aqiStatus" style="color: var(--accent-color);">获取中...</span></div>
+            </div>
+        </div>
+
+        <!-- 气压变化曲线与敏感人群参考面板 -->
+        <div class="card">
+            <h3 style="margin: 0 0 10px 0; font-size: 15px; color: var(--text-color);">📈 气压变化趋势与健康参考</h3>
+            <p id="pressureTrend" style="margin: 0 0 10px 0; font-size: 13px; color: var(--text-secondary);">正在分析气压变化...</p>
+            <div id="pressureHourly" style="display: flex; gap: 10px; overflow-x: auto; font-size: 12px; color: var(--text-secondary); padding-top: 5px; border-top: 1px solid var(--border-color); text-align: center;"></div>
+        </div>
+
+        <!-- 逐小时预报 -->
+        <div class="section-title">🔜未来24小时预报</div>
+        <div class="hourly-container" id="hourlyContainer"></div>
+
+        <!-- 多天预报 -->
+        <div class="section-title">📅 未来多日预报</div>
+        <div class="daily-list" id="dailyList"></div>
+
+        <!-- 历史 24 小时回看 -->
+        <div class="section-title">🔙过去24小时回看</div>
+        <div class="hourly-container" id="pastHourlyContainer"></div>
+
+        <!-- 历史每日高低温回看 -->
+        <div class="section-title">📅 过去多日回看</div>
+        <div class="daily-list" id="pastDailyList"></div>
+
+        <!-- 杂项与建议面板 -->
+        <div class="tips-card">
+            <h3>💡 生活建议</h3>
+            <p id="advice">正在结合气象数据为您生成建议...</p>
+            <p id="lifestyleIndices" style="margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 8px;"></p>
+        </div>
+
+        <!-- 今日天气小简报面板 -->
+        <div class="card" style="text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 15px; color: var(--text-color);">📋 今日天气小简报</h3>
+                <button class="tool-btn" style="flex: unset; padding: 6px 12px; font-size: 12px; background: var(--accent-color); color: white; border: none;" onclick="copyWeatherBrief()">复制简报</button>
+            </div>
+            <div id="weatherBriefText" style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; word-break: break-all; background: rgba(0,0,0,0.1); padding: 12px; border-radius: 12px;">正在生成简报...</div>
+        </div>
+
+        <!-- 底部气象谚语/物候 API 面板 -->
+        <div class="card" style="margin-bottom: 25px; text-align: left; padding: 18px 20px;">
+            <h3 style="margin: 0 0 6px 0; font-size: 14px; color: var(--accent-color);">📜 每日一句</h3>
+            <p id="proverbText" style="margin: 0; font-size: 13px; color: var(--text-secondary); font-style: italic; line-height: 1.5;">正在获取每日一句...</p>
+        </div>
+    </div>
+
+    <script>
+        let currentLat = 39.9042;
+        let currentLon = 116.4074;
+        let currentName = "北京";
+        let currentTimezone = "auto";
+        let currentUnit = 'C';
+        let is24Hour = true;
+        let fontSizeLevel = 0;
+        let lastWeatherData = null;
+        let lastAirData = null;
+        let weatherBriefContent = "";
+        let isFetching = false;
+        let favoriteCities = [
+            { val: "39.9042,116.4074,北京", name: "北京" },
+            { val: "31.2304,121.4737,上海", name: "上海" }
+        ];
+
+        // 1. 本地存储 (localStorage) 配置保存与加载
+        function saveSettings() {
+            localStorage.setItem('weather_lat', currentLat);
+            localStorage.setItem('weather_lon', currentLon);
+            localStorage.setItem('weather_name', currentName);
+            localStorage.setItem('weather_timezone', currentTimezone);
+            localStorage.setItem('weather_unit', currentUnit);
+            localStorage.setItem('weather_is24Hour', is24Hour);
+            localStorage.setItem('weather_fontSizeLevel', fontSizeLevel);
+            localStorage.setItem('weather_theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
+            localStorage.setItem('weather_favorites', JSON.stringify(favoriteCities));
+        }
+
+        function loadSettings() {
+            const savedLat = localStorage.getItem('weather_lat');
+            const savedLon = localStorage.getItem('weather_lon');
+            const savedName = localStorage.getItem('weather_name');
+            if (savedLat && savedLon) {
+                currentLat = savedLat;
+                currentLon = savedLon;
+                currentName = savedName || "北京";
+                document.getElementById('selectedCityText').innerText = currentName;
+            }
+
+            const savedUnit = localStorage.getItem('weather_unit');
+            if (savedUnit) {
+                currentUnit = savedUnit;
+                document.getElementById('unitBtn').innerText = currentUnit === 'C' ? '℃ / ℉' : '℉ / ℃';
+            }
+
+            const saved24 = localStorage.getItem('weather_is24Hour');
+            if (saved24 !== null) {
+                is24Hour = saved24 === 'true';
+                document.getElementById('hourFormatBtn').innerText = is24Hour ? '24时' : '12时';
+            }
+
+            const savedFont = localStorage.getItem('weather_fontSizeLevel');
+            if (savedFont !== null) {
+                fontSizeLevel = parseInt(savedFont, 10);
+                const btn = document.getElementById('fontSizeBtn');
+                if (fontSizeLevel === 0) {
+                    document.documentElement.style.setProperty('--body-font-size', '14px');
+                    btn.innerText = '🔤 标准';
+                } else if (fontSizeLevel === 1) {
+                    document.documentElement.style.setProperty('--body-font-size', '16px');
+                    btn.innerText = '🔤 较大';
+                } else {
+                    document.documentElement.style.setProperty('--body-font-size', '18px');
+                    btn.innerText = '🔤 特大';
+                }
+            }
+
+            const savedFavorites = localStorage.getItem('weather_favorites');
+            if (savedFavorites) {
+                try {
+                    favoriteCities = JSON.parse(savedFavorites);
+                } catch(e) {
+                    favoriteCities = [];
+                }
+            }
+
+            // 3. 按照本机时间（本机时间！）的昼夜切换光暗模式
+            const savedTheme = localStorage.getItem('weather_theme');
+            if (savedTheme) {
+                if (savedTheme === 'light') {
+                    document.body.classList.add('light-theme');
+                } else {
+                    document.body.classList.remove('light-theme');
+                }
+            } else {
+                const localHour = new Date().getHours();
+                // 白天 (6点至18点) 自动采用浅色模式，其余时间采用深色模式
+                if (localHour >= 6 && localHour < 18) {
+                    document.body.classList.add('light-theme');
+                } else {
+                    document.body.classList.remove('light-theme');
+                }
+            }
+        }
+
+        // 2. 收藏城市功能支持
+        function isFavorite(val) {
+            return favoriteCities.some(c => c.val === val);
+        }
+
+        function toggleFavorite(val, name, event) {
+            if (event) event.stopPropagation();
+            if (isFavorite(val)) {
+                favoriteCities = favoriteCities.filter(c => c.val !== val);
+            } else {
+                favoriteCities.push({ val, name });
+            }
+            saveSettings();
+            initCityDropdown();
+        }
+
+        function selectCityOptionFromFav(val, name) {
+            document.getElementById('selectedCityText').innerText = name;
+            document.getElementById('citySelect').value = val;
+            document.getElementById('dropdownPanel').classList.remove('open');
+            const parts = val.split(',');
+            currentLat = parts[0];
+            currentLon = parts[1];
+            currentName = parts[2];
+            saveSettings();
+            fetchWeatherData();
+        }
+
+        function initCityDropdown() {
+            const selectEl = document.getElementById('citySelect');
+            const container = document.getElementById('cityGroupsContainer');
+            if (!selectEl || !container) return;
+
+            let html = '';
+
+            // 顶部单独分组展示常用/收藏城市
+            html += `<div class="city-optgroup-header" onclick="toggleCityGroup(this)">
+                <span>⭐ 常用城市 (收藏)</span>
+                <span>▼</span>
+            </div>`;
+            html += `<div class="city-options-list expanded" data-group-index="fav">`;
+            if (favoriteCities.length === 0) {
+                html += `<div class="city-option-item" style="color:var(--text-secondary); cursor:default;">暂无收藏城市，点击下方城市右侧 ⭐ 添加</div>`;
+            } else {
+                favoriteCities.forEach(fav => {
+                    html += `<div class="city-option-item" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="flex:1;" onclick="selectCityOptionFromFav('${fav.val}', '${fav.name}')">${fav.name}</span>
+                        <span onclick="toggleFavorite('${fav.val}', '${fav.name}', event)" style="cursor:pointer; color:#f43f5e; padding:2px 6px;" title="取消收藏">★ 已收藏</span>
+                    </div>`;
+                });
+            }
+            html += `</div>`;
+
+            // 常规分组
+            const optgroups = selectEl.querySelectorAll('optgroup');
+            optgroups.forEach((group, gIdx) => {
+                const groupLabel = group.getAttribute('label');
+                html += `<div class="city-optgroup-header" onclick="toggleCityGroup(this)">
+                    <span>${groupLabel}</span>
+                    <span>▶</span>
+                </div>`;
+                html += `<div class="city-options-list" data-group-index="${gIdx}">`;
+                const options = group.querySelectorAll('option');
+                options.forEach(opt => {
+                    const favorited = isFavorite(opt.value);
+                    const starText = favorited ? '★' : '☆';
+                    const starColor = favorited ? 'color: #f43f5e;' : 'color: var(--text-secondary);';
+                    html += `<div class="city-option-item" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="flex:1;" onclick="selectCityOption(this, '${opt.value}', '${opt.innerText}')">${opt.innerText}</span>
+                        <span onclick="toggleFavorite('${opt.value}', '${opt.innerText}', event)" style="cursor:pointer; ${starColor} padding:2px 6px;" title="${favorited ? '取消收藏' : '添加收藏'}">${starText}</span>
+                    </div>`;
+                });
+                html += `</div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleDropdownPanel() {
+            const panel = document.getElementById('dropdownPanel');
+            panel.classList.toggle('open');
+            if (panel.classList.contains('open')) {
+                document.getElementById('dropdownSearchInput').focus();
+            }
+        }
+
+        function toggleCityGroup(headerEl) {
+            const listEl = headerEl.nextElementSibling;
+            const arrow = headerEl.querySelector('span:last-child');
+            listEl.classList.toggle('expanded');
+            arrow.innerText = listEl.classList.contains('expanded') ? '▼' : '▶';
+        }
+
+        function selectCityOption(itemEl, val, name) {
+            document.getElementById('selectedCityText').innerText = name;
+            document.getElementById('citySelect').value = val;
+            document.getElementById('dropdownPanel').classList.remove('open');
+            const parts = val.split(',');
+            currentLat = parts[0];
+            currentLon = parts[1];
+            currentName = parts[2];
+            saveSettings();
+            fetchWeatherData();
+        }
+
+        function filterCityDropdown(query) {
+            query = query.toLowerCase().trim();
+            const groups = document.querySelectorAll('.city-optgroup-header');
+            groups.forEach(header => {
+                const list = header.nextElementSibling;
+                const items = list.querySelectorAll('.city-option-item');
+                let groupHasMatch = false;
+                items.forEach(item => {
+                    const text = item.innerText.toLowerCase();
+                    if (text.includes(query)) {
+                        item.style.display = 'flex';
+                        groupHasMatch = true;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+                if (query === '') {
+                    list.classList.remove('expanded');
+                    header.style.display = 'flex';
+                } else {
+                    if (groupHasMatch) {
+                        list.classList.add('expanded');
+                        header.style.display = 'flex';
+                    } else {
+                        header.style.display = 'none';
+                        list.classList.remove('expanded');
+                    }
+                }
+            });
+        }
+
+        window.addEventListener('click', function(e) {
+            const container = document.querySelector('.custom-dropdown-container');
+            if (container && !container.contains(e.target)) {
+                document.getElementById('dropdownPanel').classList.remove('open');
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            initCityDropdown();
+            fetchWeatherData();
+        });
+
+        function toggleTheme() {
+            document.body.classList.toggle('light-theme');
+            saveSettings();
+        }
+
+        function toggleUnit() {
+            currentUnit = currentUnit === 'C' ? 'F' : 'C';
+            document.getElementById('unitBtn').innerText = currentUnit === 'C' ? '℃ / ℉' : '℉ / ℃';
+            saveSettings();
+            if (lastWeatherData) {
+                renderWeatherData(lastWeatherData, lastAirData);
+            }
+        }
+
+        function toggleHourFormat() {
+            is24Hour = !is24Hour;
+            document.getElementById('hourFormatBtn').innerText = is24Hour ? '24时' : '12时';
+            saveSettings();
+            updateLocalTime();
+            if (lastWeatherData) {
+                renderWeatherData(lastWeatherData, lastAirData);
+            }
+        }
+
+        function toggleFontSize() {
+            fontSizeLevel = (fontSizeLevel + 1) % 3;
+            const btn = document.getElementById('fontSizeBtn');
+            if (fontSizeLevel === 0) {
+                document.documentElement.style.setProperty('--body-font-size', '14px');
+                btn.innerText = '🔤 标准';
+            } else if (fontSizeLevel === 1) {
+                document.documentElement.style.setProperty('--body-font-size', '16px');
+                btn.innerText = '🔤 较大';
+            } else {
+                document.documentElement.style.setProperty('--body-font-size', '18px');
+                btn.innerText = '🔤 特大';
+            }
+            saveSettings();
+        }
+
+        function formatTemp(celsius) {
+            if (celsius === undefined || celsius === null || isNaN(celsius)) return '--';
+            if (currentUnit === 'F') {
+                const f = (celsius * 9 / 5) + 32;
+                return `${Math.round(f)}°F`;
+            }
+            return `${celsius}°C`;
+        }
+
+        function getWeatherDesc(code) {
+            const map = {
+                0: "晴朗 ☀️",
+                1: "大部晴朗 🌤️",
+                2: "局部多云 ⛅",
+                3: "阴天 ☁️",
+                5: "霾 🌫️",
+                6: "空中浮尘 🌪️",
+                7: "近地扬沙 🌪️",
+                8: "沙尘暴 🌪️",
+                9: "强沙尘暴 🌪️",
+                10: "薄雾 🌫️",
+                11: "小片浅雾 🌫️",
+                12: "持续浅雾 🌫️",
+                13: "闪电 ⚡",
+                45: "大雾 🌫️",
+                48: "冰雾 🌫️",
+                51: "轻雾雨 🌧️",
+                53: "中雾雨 🌧️",
+                55: "浓雾雨 🌧️",
+                56: "轻度冻雾雨 ❄️🌧️",
+                57: "重度冻雾雨 ❄️🌧️",
+                58: "轻雾雨夹雪 ❄️🌧️",
+                59: "浓雾雨夹雪 ❄️🌧️",
+                61: "小雨 🌧️",
+                63: "中雨 🌧️",
+                65: "大雨 🌧️",
+                66: "轻度冻雨 ❄️🌧️",
+                67: "强冻雨 ❄️🌧️",
+                71: "小雪 ❄️",
+                73: "中雪 ❄️",
+                75: "大雪 ❄️",
+                77: "雪粒/冰粒 ❄️",
+                80: "零星阵雨 🌦️",
+                81: "中等阵雨 🌦️",
+                82: "强阵雨 🌧️",
+                85: "小阵雪 ❄️🌨️",
+                86: "大阵雪 ❄️🌨️",
+                87: "小冰粒阵雨 🌦️⚫",
+                88: "大冰粒阵雨 🌦️⚫",
+                89: "零星冰雹阵雨 🌦️⚫",
+                90: "强冰雹阵雨 🌦️⚫",
+                95: "雷雨 ⚡",
+                96: "雷雨伴小冰雹 ⚫⚡",
+                99: "雷雨伴冰雹 🔴⚡"
+            };
+            return map[code] || `未知天气(编码${code})`;
+        }
+
+        function getWindDirection(degrees) {
+            if (degrees === undefined) return "";
+            const directions = ["北风", "东北风", "东风", "东南风", "南风", "西南风", "西风", "西北风"];
+            const index = Math.round((degrees % 360) / 45);
+            return directions[index % 8];
+        }
+
+        function getWindLevel(speedKmH) {
+            if (speedKmH < 1) return "无风 (0级)";
+            if (speedKmH <= 5) return "软风 (1级)";
+            if (speedKmH <= 11) return "轻风 (2级)";
+            if (speedKmH <= 19) return "微风 (3级)";
+            if (speedKmH <= 28) return "和风 (4级)";
+            if (speedKmH <= 38) return "清风 (5级)";
+            if (speedKmH <= 49) return "强风/大风 (6级)";
+            if (speedKmH <= 61) return "疾风 (7级)";
+            if (speedKmH <= 74) return "大风 (8级)";
+            if (speedKmH <= 88) return "烈风 (9级)";
+            if (speedKmH <= 102) return "狂风 (10级)";
+            if (speedKmH <= 117) return "暴风 (11级)";
+            return "飓风 (12级以上)";
+        }
+
+        function updateLocalTime() {
+            try {
+                const now = new Date();
+                const options = { 
+                    timeZone: currentTimezone !== "auto" ? currentTimezone : undefined,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit',
+                    hour12: !is24Hour 
+                };
+                const timeString = new Intl.DateTimeFormat('zh-CN', options).format(now);
+                
+                let utcStr = "";
+                try {
+                    const tzOptions = { timeZone: currentTimezone !== "auto" ? currentTimezone : undefined, timeZoneName: 'shortOffset' };
+                    const parts = new Intl.DateTimeFormat('en-US', tzOptions).formatToParts(now);
+                    const tzPart = parts.find(p => p.type === 'timeZoneName');
+                    if (tzPart) {
+                        utcStr = ` (${tzPart.value.replace('GMT', 'UTC')})`;
+                    }
+                } catch(e) {
+                    utcStr = "";
+                }
+
+                document.getElementById('localTime').innerText = `当地时间: ${timeString}${utcStr}`;
+            } catch (e) {
+                document.getElementById('localTime').innerText = `当地时间: ${new Date().toLocaleString()}`;
+            }
+        }
+
+        setInterval(updateLocalTime, 1000);
+
+        function changeCity() {
+            const select = document.getElementById('citySelect');
+            const val = select.value.split(',');
+            currentLat = val[0];
+            currentLon = val[1];
+            currentName = val[2];
+            document.getElementById('selectedCityText').innerText = currentName;
+            saveSettings();
+            fetchWeatherData();
+        }
+
+        function searchCustomCity() {
+            const query = document.getElementById('customCityInput').value.trim();
+            if (!query) return;
+            
+            document.getElementById('condition').innerText = "搜索城市中...";
+            const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=zh`;
+            
+            fetch(geoUrl)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.results && data.results.length > 0) {
+                        const loc = data.results[0];
+                        currentLat = loc.latitude;
+                        currentLon = loc.longitude;
+                        currentName = loc.name + (loc.country ? ` (${loc.country})` : '');
+                        document.getElementById('selectedCityText').innerText = currentName;
+                        saveSettings();
+                        fetchWeatherData();
+                    } else {
+                        alert("未找到该城市");
+                        document.getElementById('condition').innerText = "搜索失败";
+                    }
+                })
+                .catch(() => {
+                    alert("网络请求失败");
+                });
+        }
+
+        function getLocationWeather() {
+            if (!navigator.geolocation) {
+                alert("您的浏览器不支持自动定位");
+                return;
+            }
+            document.getElementById('condition').innerText = "正在获取GPS定位...";
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    currentLat = position.coords.latitude;
+                    currentLon = position.coords.longitude;
+                    currentName = "当前GPS定位";
+                    document.getElementById('selectedCityText').innerText = currentName;
+                    saveSettings();
+                    fetchWeatherData();
+                },
+                error => {
+                    alert("GPS定位失败，请检查定位权限");
+                    document.getElementById('condition').innerText = "定位失败";
+                },
+                { timeout: 10000 }
+            );
+        }
+
+        function getIPLocationWeather() {
+            document.getElementById('condition').innerText = "正在通过 IP 定位分析所在地...";
+            fetch('https://ipwhois.app/json/')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        currentLat = data.latitude;
+                        currentLon = data.longitude;
+                        currentName = `${data.city} (${data.country})`;
+                        document.getElementById('selectedCityText').innerText = currentName;
+                        saveSettings();
+                        fetchWeatherData();
+                    } else {
+                        alert("IP定位失败: " + (data.message || "未知错误"));
+                        document.getElementById('condition').innerText = "IP定位失败";
+                    }
+                })
+                .catch(() => {
+                    alert("IP 定位请求网络失败");
+                    document.getElementById('condition').innerText = "IP定位失败";
+                });
+        }
+
+        function calcPollutantAqi(c, breakpoints) {
+            if (c === undefined || c === null || isNaN(c)) return 0;
+            for (let bp of breakpoints) {
+                if (c >= bp.cLo && c <= bp.cHi) {
+                    return Math.round(((bp.iHi - bp.iLo) / (bp.cHi - bp.cLo)) * (c - bp.cLo) + bp.iLo);
+                }
+            }
+            return c > breakpoints[breakpoints.length - 1].cHi ? 500 : 0;
+        }
+
+        function convertEuropeanToNationalAqi(pm25, pm10, no2, o3) {
+            const pm25Bp = [
+                {cLo:0, cHi:35, iLo:0, iHi:50},
+                {cLo:35, cHi:75, iLo:50, iHi:100},
+                {cLo:75, cHi:115, iLo:100, iHi:150},
+                {cLo:115, cHi:150, iLo:150, iHi:200},
+                {cLo:150, cHi:250, iLo:200, iHi:300},
+                {cLo:250, cHi:350, iLo:300, iHi:400},
+                {cLo:350, cHi:500, iLo:400, iHi:500}
+            ];
+            const pm10Bp = [
+                {cLo:0, cHi:50, iLo:0, iHi:50},
+                {cLo:50, cHi:150, iLo:50, iHi:100},
+                {cLo:150, cHi:250, iLo:100, iHi:150},
+                {cLo:250, cHi:350, iLo:150, iHi:200},
+                {cLo:350, cHi:420, iLo:200, iHi:300},
+                {cLo:420, cHi:500, iLo:300, iHi:400},
+                {cLo:500, cHi:600, iLo:400, iHi:500}
+            ];
+            const no2Bp = [
+                {cLo:0, cHi:100, iLo:0, iHi:50},
+                {cLo:100, cHi:200, iLo:50, iHi:100},
+                {cLo:200, cHi:700, iLo:100, iHi:150},
+                {cLo:700, cHi:1200, iLo:150, iHi:200},
+                {cLo:1200, cHi:2340, iLo:200, iHi:300},
+                {cLo:2340, cHi:3090, iLo:300, iHi:400},
+                {cLo:3090, cHi:3840, iLo:400, iHi:500}
+            ];
+            const o3Bp = [
+                {cLo:0, cHi:160, iLo:0, iHi:50},
+                {cLo:160, cHi:200, iLo:50, iHi:100},
+                {cLo:200, cHi:300, iLo:100, iHi:150},
+                {cLo:300, cHi:400, iLo:150, iHi:200},
+                {cLo:400, cHi:800, iLo:200, iHi:300},
+                {cLo:800, cHi:1000, iLo:300, iHi:400},
+                {cLo:1000, cHi:1200, iLo:400, iHi:500}
+            ];
+
+            const aqiPm25 = calcPollutantAqi(pm25, pm25Bp);
+            const aqiPm10 = calcPollutantAqi(pm10, pm10Bp);
+            const aqiNo2 = calcPollutantAqi(no2, no2Bp);
+            const aqiO3 = calcPollutantAqi(o3, o3Bp);
+
+            return Math.max(aqiPm25, aqiPm10, aqiNo2, aqiO3);
+        }
+
+        function fetchWeatherData() {
+            if (isFetching) return;
+            isFetching = true;
+
+            document.getElementById('cityName').innerText = currentName;
+            document.getElementById('condition').innerText = "数据更新中...";
+
+            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,uv_index,visibility,snow_depth&hourly=temperature_2m,weather_code,precipitation_probability,precipitation,pressure_msl&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max,precipitation_sum&past_days=7&timezone=auto`;
+            const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${currentLat}&longitude=${currentLon}&current=pm10,pm2_5,nitrogen_dioxide,ozone,european_aqi`;
+
+            Promise.all([
+                fetch(weatherUrl).then(res => res.json()),
+                fetch(airQualityUrl).then(res => res.json()).catch(() => null)
+            ])
+            .then(([weatherData, airData]) => {
+                if (weatherData.timezone) {
+                    currentTimezone = weatherData.timezone;
+                }
+                updateLocalTime();
+                lastWeatherData = weatherData;
+                lastAirData = airData;
+                renderWeatherData(weatherData, airData);
+                isFetching = false;
+            })
+            .catch(() => {
+                document.getElementById('condition').innerText = "获取失败";
+                document.getElementById('advice').innerText = "网络连接异常，请检查网络设置。";
+                isFetching = false;
+            });
+
+            fetchProverb();
+        }
+
+        function fetchProverb() {
+            fetch('https://v1.hitokoto.cn/')
+                .then(res => res.json())
+                .then(data => {
+                    const text = `“${data.hitokoto}” —— ${data.from || '文'}`;
+                    document.getElementById('proverbText').innerText = text;
+                })
+                .catch(() => {
+                    document.getElementById('proverbText').innerText = "“东虹日出西虹雨，日落云里走，雨在半夜后。”（传统气象民谚）";
+                });
+        }
+
+        function updateWeatherBrief(data, airData) {
+            if (!data || !data.current) return;
+            const cur = data.current;
+            const tempStr = formatTemp(cur.temperature_2m);
+            const apparentStr = formatTemp(cur.apparent_temperature);
+            const cond = getWeatherDesc(cur.weather_code);
+            const humidity = `${cur.relative_humidity_2m}%`;
+            const wind = `${getWindDirection(cur.wind_direction_10m)} ${cur.wind_speed_10m} km/h`;
+            
+            let aqiStr = "暂无";
+            if (airData && airData.current && airData.current.european_aqi !== undefined) {
+                aqiStr = airData.current.european_aqi;
+            }
+
+            weatherBriefContent = `【天气小简报】📍 ${currentName}\n🌡️ 气温: ${tempStr} (体感 ${apparentStr})\n☁️ 天气: ${cond}\n💧 湿度: ${humidity}\n💨 风况: ${wind}\n🍃 空气AQI: ${aqiStr}\n📅 祝您生活愉快，顺心如意！`;
+            
+            document.getElementById('weatherBriefText').innerText = weatherBriefContent;
+        }
+
+        function copyWeatherBrief() {
+            if (!weatherBriefContent) {
+                alert("暂无简报内容可复制");
+                return;
+            }
+            navigator.clipboard.writeText(weatherBriefContent).then(() => {
+                alert("✅ 简报已成功复制到剪贴板！");
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = weatherBriefContent;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    alert("✅ 简报已成功复制到剪贴板！");
+                } catch (err) {
+                    alert("❌ 复制失败，请手动选择复制。");
+                }
+                document.body.removeChild(textarea);
+            });
+        }
+
+        function renderWeatherData(data, airData) {
+            const cur = data.current;
+            document.getElementById('temp').innerText = formatTemp(cur.temperature_2m);
+            document.getElementById('apparentTemp').innerText = formatTemp(cur.apparent_temperature);
+            document.getElementById('humidity').innerText = `${cur.relative_humidity_2m}%`;
+            
+            const windDirStr = getWindDirection(cur.wind_direction_10m);
+            const windLevelText = getWindLevel(cur.wind_speed_10m);
+            document.getElementById('windSpeed').innerText = `${windDirStr} ${cur.wind_speed_10m} km/h (${windLevelText})`;
+            
+            document.getElementById('pressure').innerText = `${cur.pressure_msl !== undefined ? cur.pressure_msl : '--'} hPa`;
+            document.getElementById('windGusts').innerText = `${cur.wind_gusts_10m !== undefined ? cur.wind_gusts_10m : '--'} km/h`;
+            
+            const uv = cur.uv_index !== undefined ? cur.uv_index : 0;
+            let uvDesc = "最弱";
+            if (uv >= 10) uvDesc = "5级（极高）";
+            else if (uv >= 7) uvDesc = "4级（高）";
+            else if (uv >= 5) uvDesc = "3级（中等）";
+            else if (uv >= 3) uvDesc = "2级（弱）";
+            else uvDesc = "1级（最弱）";
+            document.getElementById('uvIndex').innerText = `${uv} (${uvDesc})`;
+
+            const visibilityKm = cur.visibility !== undefined ? (cur.visibility / 1000).toFixed(1) : '--';
+            const snowDepthCm = cur.snow_depth !== undefined ? (cur.snow_depth * 100).toFixed(0) : '0';
+            document.getElementById('visibility').innerText = `${visibilityKm} km`;
+            document.getElementById('snowDepth').innerText = `${snowDepthCm} cm`;
+
+            const currentHour = new Date().getHours();
+            const curPrecipProb = (data.hourly && data.hourly.precipitation_probability) ? data.hourly.precipitation_probability[currentHour] : '--';
+            const curPrecipAmount = (data.hourly && data.hourly.precipitation) ? data.hourly.precipitation[currentHour] : 0;
+            document.getElementById('precipitationProb').innerText = `${curPrecipProb}%`;
+            document.getElementById('precipitationAmount').innerText = `${curPrecipAmount} mm`;
+
+            document.getElementById('condition').innerText = getWeatherDesc(cur.weather_code);
+
+            const alertBanner = document.getElementById('alertBanner');
+            let alertMessages = [];
+            if (cur.temperature_2m >= 38) alertMessages.push("⚠️ 【高温酷暑警报】当前气温已高达 38℃ 或以上，请做好严格防暑降温，避免午后长时间户外暴露！");
+            if (cur.temperature_2m <= -15) alertMessages.push("⚠️ 【严寒冰冻警报】当前气温跌至 -15℃ 以下，极易造成冻伤，请注意加强防寒保暖！");
+            if (cur.wind_speed_10m >= 50) alertMessages.push("⚠️ 【大风灾害警报】瞬时风力极为强劲，请远离高空悬挂物、临时搭建物及老树！");
+            if (cur.wind_gusts_10m >= 39) alertMessages.push("⚠️ 【大风阵风预警】检测到阵风达到或超过6级（≥39 km/h），请注意防范大风！");
+            if ([51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99].includes(cur.weather_code)) alertMessages.push("⚠️ 【降水/雷暴警报】检测到雨雪或雷电天气，请务必注意出行安全！");
+
+            if (alertMessages.length > 0) {
+                alertBanner.style.display = "block";
+                alertBanner.innerHTML = alertMessages.join("<br>");
+            } else {
+                alertBanner.style.display = "none";
+            }
+
+            if (airData && airData.current) {
+                const aq = airData.current;
+                const eAqi = aq.european_aqi !== undefined ? aq.european_aqi : '--';
+                const pm25Val = aq.pm2_5 !== undefined ? aq.pm2_5 : 0;
+                const pm10Val = aq.pm10 !== undefined ? aq.pm10 : 0;
+                const no2Val = aq.nitrogen_dioxide !== undefined ? aq.nitrogen_dioxide : 0;
+                const o3Val = aq.ozone !== undefined ? aq.ozone : 0;
+
+                const nAqi = convertEuropeanToNationalAqi(pm25Val, pm10Val, no2Val, o3Val);
+
+                document.getElementById('europeanAqi').innerText = eAqi;
+                document.getElementById('nationalAqi').innerText = nAqi;
+                document.getElementById('pm25').innerText = pm25Val;
+                document.getElementById('pm10').innerText = pm10Val;
+                document.getElementById('no2').innerText = no2Val;
+                document.getElementById('ozone').innerText = o3Val;
+
+                let aqiDesc = "优 (一级) 🟢";
+                if (nAqi > 50 && nAqi <= 100) aqiDesc = "良 (二级) 🟡";
+                else if (nAqi > 100 && nAqi <= 150) aqiDesc = "轻度污染 (三级) 🟠";
+                else if (nAqi > 150 && nAqi <= 200) aqiDesc = "中度污染 (四级) 🔴";
+                else if (nAqi > 200) aqiDesc = "重度及以上污染 🟣";
+                document.getElementById('aqiStatus').innerText = aqiDesc;
+            } else {
+                document.getElementById('europeanAqi').innerText = '暂无';
+                document.getElementById('nationalAqi').innerText = '暂无';
+                document.getElementById('pm25').innerText = '--';
+                document.getElementById('pm10').innerText = '--';
+                document.getElementById('no2').innerText = '--';
+                document.getElementById('ozone').innerText = '--';
+                document.getElementById('aqiStatus').innerText = '数据暂时不可用';
+            }
+
+            updateWeatherBrief(data, airData);
+
+            if (data.hourly && data.hourly.pressure_msl) {
+                const pressures = data.hourly.pressure_msl;
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hour = String(now.getHours()).padStart(2, '0');
+                const targetStr = `${year}-${month}-${day}T${hour}`;
+                let currentIdx = 72 + now.getHours();
+                for (let i = 0; i < data.hourly.time.length; i++) {
+                    if (data.hourly.time[i].startsWith(targetStr)) {
+                        currentIdx = i;
+                        break;
+                    }
+                }
+
+                const pastPressure = pressures[Math.max(0, currentIdx - 3)];
+                const currentPressure = pressures[currentIdx];
+                const diff = currentPressure - pastPressure;
+                
+                let pressureDesc = `当前气压平稳 (${currentPressure} hPa)。`;
+                if (diff < -2) {
+                    pressureDesc = `⚠️ 气压近期出现骤降（降幅约 ${Math.abs(diff).toFixed(1)} hPa），气压骤降预示将有降雨或天气转坏！敏感人群请注意关注身体变化。`;
+                } else if (diff > 2) {
+                    pressureDesc = `气压近期有所上升 (${currentPressure} hPa)，天气系统趋于稳定。`;
+                }
+                document.getElementById('pressureTrend').innerText = pressureDesc;
+
+                let pressureHourlyHtml = "";
+                for (let i = Math.max(0, currentIdx - 6); i <= Math.min(pressures.length - 1, currentIdx + 6); i++) {
+                    const hLabel = data.hourly.time[i] ? data.hourly.time[i].slice(11, 16) : '';
+                    pressureHourlyHtml += `<div style="min-width:45px;"><div>${hLabel}</div><div><b>${Math.round(pressures[i])}</b></div></div>`;
+                }
+                document.getElementById('pressureHourly').innerHTML = pressureHourlyHtml;
+            }
+
+            if (data.daily && data.daily.sunrise && data.daily.sunset) {
+                const todayDateStr = new Date().toLocaleDateString('en-CA');
+                let todayDailyIdx = 0;
+                for (let i = 0; i < data.daily.time.length; i++) {
+                    if (data.daily.time[i] === todayDateStr) {
+                        todayDailyIdx = i;
+                        break;
+                    }
+                }
+                document.getElementById('sunriseTime').innerText = data.daily.sunrise[todayDailyIdx] ? data.daily.sunrise[todayDailyIdx].split('T')[1] : '--:--';
+                document.getElementById('sunsetTime').innerText = data.daily.sunset[todayDailyIdx] ? data.daily.sunset[todayDailyIdx].split('T')[1] : '--:--';
+            }
+
+            // 历史 24 小时天气回看
+            if (data.hourly && data.hourly.time) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hour = String(now.getHours()).padStart(2, '0');
+                const targetStr = `${year}-${month}-${day}T${hour}`;
+                let currentIdx = 72 + now.getHours();
+                for (let i = 0; i < data.hourly.time.length; i++) {
+                    if (data.hourly.time[i].startsWith(targetStr)) {
+                        currentIdx = i;
+                        break;
+                    }
+                }
+
+                let pastHourlyHtml = "";
+                const startPast = Math.max(0, currentIdx - 24);
+                for (let i = startPast; i < currentIdx; i++) {
+                    const t = data.hourly.temperature_2m[i];
+                    const timeFullStr = data.hourly.time[i];
+                    const timeDisplay = timeFullStr.slice(5, 16).replace('T', ' ');
+                    const code = data.hourly.weather_code[i];
+                    const pop = data.hourly.precipitation_probability ? data.hourly.precipitation_probability[i] : 0;
+                    pastHourlyHtml += `
+                        <div class="hourly-item">
+                            <div style="color:var(--text-secondary); font-size:11px;">${timeDisplay}</div>
+                            <div style="font-size:16px; margin: 5px 0;">${formatTemp(t)}</div>
+                            <div style="font-size:12px; color:var(--accent-color);">${getWeatherDesc(code)}</div>
+                            <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">💧${pop}%</div>
+                        </div>
+                    `;
+                }
+                document.getElementById('pastHourlyContainer').innerHTML = pastHourlyHtml;
+
+                // 未来 24 小时预报
+                let hourlyHtml = "";
+                for (let i = currentIdx; i < Math.min(data.hourly.time.length, currentIdx + 24); i++) {
+                    const t = data.hourly.temperature_2m[i];
+                    const timeFullStr = data.hourly.time[i];
+                    const timeDisplay = timeFullStr.slice(11, 16);
+                    const code = data.hourly.weather_code[i];
+                    const pop = data.hourly.precipitation_probability ? data.hourly.precipitation_probability[i] : 0;
+                    hourlyHtml += `
+                        <div class="hourly-item">
+                            <div style="color:var(--text-secondary); font-size:11px;">${timeDisplay}</div>
+                            <div style="font-size:16px; margin: 5px 0;">${formatTemp(t)}</div>
+                            <div style="font-size:12px; color:var(--accent-color);">${getWeatherDesc(code)}</div>
+                            <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">💧${pop}%</div>
+                        </div>
+                    `;
+                }
+                document.getElementById('hourlyContainer').innerHTML = hourlyHtml;
+            }
+
+            // 多天预报与过去多日回看
+            if (data.daily && data.daily.time) {
+                let dailyHtml = "";
+                let pastDailyHtml = "";
+                const todayDateStr = new Date().toLocaleDateString('en-CA');
+                
+                for (let i = 0; i < data.daily.time.length; i++) {
+                    const dateStr = data.daily.time[i];
+                    const maxT = data.daily.temperature_2m_max[i];
+                    const minT = data.daily.temperature_2m_min[i];
+                    const code = data.daily.weather_code[i];
+                    const popMax = data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[i] : 0;
+                    
+                    const itemHtml = `
+                        <div class="daily-item">
+                            <div style="width: 90px;">${dateStr}</div>
+                            <div>${getWeatherDesc(code)}</div>
+                            <div>💧${popMax}%</div>
+                            <div>${formatTemp(minT)} ~ ${formatTemp(maxT)}</div>
+                        </div>
+                    `;
+
+                    if (dateStr < todayDateStr) {
+                        pastDailyHtml += itemHtml;
+                    } else {
+                        dailyHtml += itemHtml;
+                    }
+                }
+                document.getElementById('dailyList').innerHTML = dailyHtml;
+                if (pastDailyHtml) {
+                    document.getElementById('pastDailyList').innerHTML = pastDailyHtml;
+                }
+            }
+
+            generateAdvice(cur, data);
+        }
+
+        function generateAdvice(cur, data) {
+            let advice = "天气舒适，适合外出活动。";
+            let indices = "穿衣建议：建议穿单衣、T恤等。 运动建议：适宜户外运动。 洗车建议：适宜洗车。 钓鱼建议：气象条件良好。";
+            const temp = cur.temperature_2m;
+            if (temp > 30) {
+                advice = "天气炎热，请注意防暑降温，及时补充水分。";
+                indices = "穿衣建议：短袖、短裙、防晒衣。 运动建议：减少剧烈户外运动。 防晒建议：必须涂抹高倍数防晒霜。";
+            } else if (temp < 10) {
+                advice = "天气较冷，请注意添衣保暖，预防感冒。";
+                indices = "穿衣建议：羽绒服、厚毛衣、风衣。 运动建议：室内运动为主。";
+            }
+            document.getElementById('advice').innerText = advice;
+            document.getElementById('lifestyleIndices').innerText = indices;
+        }
+    </script>
+</body>
+</html>
