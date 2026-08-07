@@ -8,7 +8,7 @@
   "short_name": "Weather",
   "start_url": "./",
   "theme_color": "#ffffff",
-  "lang": "zh"
+  "lang": "zh",
   "icons": [
     {
       "src": "/weather-app/icon.png",
